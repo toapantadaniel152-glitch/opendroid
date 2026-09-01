@@ -11,6 +11,79 @@ Orden: la más reciente arriba.
 
 ---
 
+## 2026-08-31 — El SDK de Android vive fuera de la ruta estándar
+
+### Qué se decidió
+
+El Android SDK se instala en **`C:\Users\Usuario\Android\Sdk`**, fuera de `AppData`.
+
+`ANDROID_HOME` y el `PATH` apuntan ahí. Con `ANDROID_HOME` definido, `local.properties`
+deja de ser necesario.
+
+### Qué se descartó
+
+**La ruta estándar `C:\Users\Usuario\AppData\Local\Android\Sdk`.**
+
+Era la elegida en el plan original, y sigue siendo la que asumen Android Studio por
+defecto y prácticamente toda la documentación y los tutoriales de internet. Se
+descartó a la fuerza, no por preferencia.
+
+### Por qué
+
+**1. Las escrituras no llegaban al disco real.**
+
+La instalación se hizo desde Claude Code, que corre como aplicación empaquetada de
+Windows (`Claude_pzs8sxrjxfjjc`). Windows le redirige `AppData\Local` a una caché
+privada del paquete:
+
+```
+C:\Users\Usuario\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\Android\Sdk
+```
+
+Todo el SDK aterrizó ahí. La ruta estándar quedó vacía en mi disco.
+
+**2. El fallo era silencioso, y eso es lo grave.**
+
+Claude Code también *leía* la ruta redirigida, así que sus verificaciones daban verde
+—listaba `adb.exe` con su tamaño exacto, confirmaba `platforms/android-36`, ejecutaba
+`sdkmanager --list_installed`— mientras mi terminal decía que la carpeta no existía.
+Costó cuatro diagnósticos equivocados (`PATH`, `PATHEXT`, PowerShell de 32 bits,
+antivirus) antes de encontrar la causa. La señal decisiva fue que **una misma ruta
+absoluta funcionaba en su sesión y fallaba en la mía**.
+
+**3. Fuera de `AppData` el problema no puede repetirse.**
+
+Verificado que el registro, el Escritorio, la raíz del perfil y `TEMP` **no** están
+redirigidos. `C:\Users\Usuario\Android\Sdk` está en la raíz del perfil: escritura real,
+sin permisos de administrador y sin depender de `winget`.
+
+**4. El coste es bajo y conocido.**
+
+El SDK de Android es reubicable; funciona igual desde cualquier ruta. Lo confirma el
+propio `adb`: `Installed as C:\Users\Usuario\Android\Sdk\platform-tools\adb.exe`. El
+único precio es tener que **traducir la ruta** cada vez que siga un tutorial que asuma
+la estándar. Queda anotado y destacado en `MIS-NOTAS.md`.
+
+### Contexto: mi AppData es normal
+
+Conviene dejarlo escrito para no confundirse dentro de unos meses. El registro
+(`User Shell Folders`) da `Local AppData = C:\Users\Usuario\AppData\Local`, sin
+junctions ni redirecciones, y OneDrive no tiene activada la copia de carpetas
+conocidas. **La redirección es de Claude Code, no de este equipo.** Cualquier
+instalación que haga yo desde mi terminal iría a la ruta estándar sin problema.
+
+De esta decisión salió también la regla de que **las compilaciones las lanzo yo desde
+mi terminal**, para no mezclar daemons de Gradle con vistas distintas del disco. Está
+en `MIS-NOTAS.md`.
+
+### Cómo revisar esta decisión más adelante
+
+Se replantea si dejo de usar Claude Code para instalar cosas y prefiero unificar con
+lo que esperan las herramientas. Mover el SDK después es barato: basta con moverlo y
+actualizar `ANDROID_HOME` y el `PATH`. Pero no hay ninguna razón técnica para hacerlo.
+
+---
+
 ## 2026-08-31 — `upstream` apunta a yashab-cyber, no a JMAN730
 
 ### Qué se decidió

@@ -2,12 +2,16 @@
 
 Notas personales sobre este fork. **Archivo nuevo, no upstream.**
 
-> **Regla de este fork:** todo archivo que ya existía al clonar es UPSTREAM y no se
-> edita nunca. Cualquier edición sobre un archivo upstream provoca conflictos en
-> cada `git pull upstream main` futuro. Mi documentación vive solo en archivos
-> nuevos: este, `PARCHES-PENDIENTES.md` y `DECISIONES.md`.
+> **Regla 1 — nada de tocar upstream.** Todo archivo que ya existía al clonar es
+> UPSTREAM y no se edita nunca. Cualquier edición sobre un archivo upstream provoca
+> conflictos en cada `git pull upstream main` futuro. Mi documentación vive solo en
+> archivos nuevos: este, `PARCHES-PENDIENTES.md` y `DECISIONES.md`.
+>
+> **Regla 2 — las compilaciones las lanzo YO.** Siempre desde mi propia terminal,
+> nunca desde Claude Code. Motivo y detalle en
+> [Reglas de trabajo en este equipo](#reglas-de-trabajo-en-este-equipo).
 
-Última actualización: 2026-08-31
+Última actualización: 2026-09-01
 
 ---
 
@@ -123,17 +127,135 @@ muy por encima del mínimo y por debajo del `targetSdk` 36.
 Como Android 15 es 14+, me afectan de lleno las restricciones de servicios en primer
 plano que arregla `faa87a2`. Ver `PARCHES-PENDIENTES.md`.
 
-**PC (estado al 2026-08-31, nada instalado todavía):**
+**PC:** Windows 11 Home, x64, Intel i5-1135G7.
 
-| Requisito | Estado |
-|---|---|
-| JDK 21 | Falta. Sin `java` en PATH, `JAVA_HOME` vacío |
-| Android SDK 36 | Falta. `ANDROID_HOME` y `ANDROID_SDK_ROOT` vacíos |
-| Android Studio | No instalado |
-| Gradle | No hace falta (lo trae el wrapper) |
-| Kotlin | No hace falta (dependencia de Gradle) |
-| Git | 2.55.0.windows.4 |
-| `local.properties` | No existe. Android Studio lo genera al abrir el proyecto |
+**Entorno instalado el 2026-09-01, verificado en mi propia terminal:**
+
+| Componente | Versión | Dónde está |
+|---|---|---|
+| JDK 21 (Eclipse Temurin) | `21.0.12.1` | `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\` |
+| Android Studio | `2026.1.3.7` | `C:\Program Files\Android\Android Studio` |
+| Android SDK — platform | `platforms/android-36` (2.0.0) | ver ruta del SDK abajo |
+| Android SDK — build-tools | `build-tools/36.1.0` | idem |
+| Android SDK — platform-tools | `37.0.1` (`adb` 1.0.41) | idem |
+| Android SDK — cmdline-tools | `latest` (rev 23) | idem |
+| Gradle | No instalado a propósito | Lo descarga `./gradlew` (9.7.0) |
+| Kotlin | No instalado a propósito | Llega como dependencia de Gradle |
+| Git | `2.55.0.windows.4` | |
+
+**Variables de entorno:**
+
+| Variable | Valor | Ámbito |
+|---|---|---|
+| `JAVA_HOME` | `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\` | Máquina |
+| `ANDROID_HOME` | `C:\Users\Usuario\Android\Sdk` | Usuario |
+| `PATH` | + `...\Android\Sdk\platform-tools` y `...\Android\Sdk\cmdline-tools\latest\bin` | Usuario |
+
+### ⚠️ El SDK NO está en la ruta por defecto
+
+```
+C:\Users\Usuario\Android\Sdk                  ← LA MÍA (real, verificada)
+C:\Users\Usuario\AppData\Local\Android\Sdk    ← la que asumen todos los tutoriales
+```
+
+**Si Android Studio o cualquier herramienta me pide la ruta del SDK, es la primera.**
+Cuando siga un tutorial que dé por hecho la segunda, tengo que traducir la ruta.
+
+**Por qué no está en la estándar.** El primer intento de instalación se hizo desde
+Claude Code, y sus escrituras a `AppData` no llegan al disco real (ver la sección
+siguiente). Los archivos se quedaron en una caché privada y la ruta estándar quedó
+vacía, aunque todas las verificaciones parecían correctas. Al detectarlo, el SDK se
+movió a `C:\Users\Usuario\Android\Sdk`, **fuera de `AppData`**, donde el problema no
+puede repetirse y no hacen falta permisos de administrador.
+
+No es un apaño: el SDK de Android es reubicable. Lo confirma el propio `adb`, que
+reporta `Installed as C:\Users\Usuario\Android\Sdk\platform-tools\adb.exe`.
+Ver `DECISIONES.md`.
+
+**Mi `AppData` es normal.** Comprobado en el registro: `User Shell Folders` da
+`Local AppData = C:\Users\Usuario\AppData\Local`, sin junctions ni redirecciones.
+El problema es de Claude Code, no de este equipo.
+
+### Otras notas del entorno
+
+- **Android Studio trae su propio Java, y es el 25**, no el 21. Por eso el JDK 21 se
+  instaló aparte: el proyecto exige 21 y no más nuevo. `gradle-daemon-jvm.properties`
+  hace que Gradle elija el 21 aunque Studio use el 25 para sí mismo.
+- **`sdkmanager` está obsoleto.** Google lo sustituye por la Android CLI (`android sdk`)
+  y cambió los identificadores de `platforms;android-36` a `platforms/android-36`, con
+  barra. Casi toda la documentación de internet usa la sintaxis antigua.
+- **`local.properties`** no hace falta: con `ANDROID_HOME` definido, Gradle encuentra el
+  SDK. Si Android Studio lo crea igualmente, no importa — está en `.gitignore`.
+- Las variables de entorno solo se leen al **abrir** una terminal. Tras cambiarlas hay
+  que abrir una ventana nueva; las que ya estaban abiertas conservan los valores viejos.
+
+---
+
+## Reglas de trabajo en este equipo
+
+Tres peculiaridades de esta máquina que ya costaron tiempo una vez. Están aquí para no
+volver a descubrirlas por las malas.
+
+### Regla: las compilaciones las lanzo YO, desde mi terminal
+
+**Nunca compilar desde Claude Code.** Siempre desde mi propia PowerShell.
+
+**Por qué.** Gradle deja un proceso residente vivo entre compilaciones (el *daemon*).
+Si Claude Code arranca uno, ese daemon hereda su vista alterada del disco. Cuando yo
+compile después desde mi terminal, mi cliente puede **reutilizar ese daemon**, que ve
+un sistema de archivos distinto al mío. El resultado son fallos incoherentes y muy
+difíciles de diagnosticar: exactamente el tipo de problema que costó cuatro rondas de
+diagnósticos equivocados el 2026-09-01.
+
+Claude Code sí puede leer el proyecto, buscar en el código, editar archivos y ayudarme
+a interpretar los errores del build. Lo que no hace es **lanzarlo**.
+
+Si alguna vez sospecho que hay un daemon con vista rara:
+
+```bash
+cd C:\Users\Usuario\Desktop\opendroid
+```
+```bash
+.\gradlew --stop
+```
+
+### Las escrituras de Claude Code a AppData no llegan al disco
+
+Claude Code corre como aplicación empaquetada de Windows (`Claude_pzs8sxrjxfjjc`), y
+Windows le redirige `AppData\Local` a una caché privada del paquete:
+
+```
+C:\Users\Usuario\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\
+```
+
+Lo que Claude Code escribe "en" `AppData\Local` aterriza ahí. **Y lo peor: al releerlo
+también lee la caché, así que sus verificaciones dan verde mientras mi disco sigue
+vacío.** Eso fue exactamente lo que pasó con el SDK.
+
+**No está redirigido** (verificado): el registro, el Escritorio, la raíz del perfil
+(`C:\Users\Usuario\...`) y `TEMP`. Ahí sus escrituras sí llegan.
+
+**Consecuencia práctica:** si Claude Code tiene que instalar algo, que sea **fuera de
+`AppData`**, o vía `winget` con elevación UAC (que escribe en el sistema real). Y la
+verificación final la hago **yo en mi terminal**, no vale la suya.
+
+### ⚠️ OneDrive: no aceptar la copia del Escritorio
+
+OneDrive está instalado y corriendo (carpeta `C:\Users\Usuario\OneDrive`), pero la
+**copia de seguridad de carpetas conocidas está desactivada**. Verificado: el registro
+da `Desktop = C:\Users\Usuario\Desktop`, ruta local, sin junction.
+
+Por eso el proyecto en `C:\Users\Usuario\Desktop\opendroid` **no se sincroniza**.
+
+**Si OneDrive ofrece alguna vez "hacer copia de seguridad de tus carpetas" y el
+Escritorio está incluido: decir que NO,** o mover el proyecto antes. Si el Escritorio
+pasara a sincronizarse, `Desktop` apuntaría a `C:\Users\Usuario\OneDrive\Escritorio` y
+el proyecto entraría con él. Una compilación de Android genera decenas de miles de
+archivos en `app\build`, y OneDrive intentaría subirlos todos: compilaciones lentísimas,
+archivos bloqueados a media escritura y conflictos de sincronización.
+
+(La carpeta de OneDrive contiene accesos directos e instaladores con pinta de
+escritorio antiguo. Es cosa aparte; el proyecto no está dentro.)
 
 ---
 

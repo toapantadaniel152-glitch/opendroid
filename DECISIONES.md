@@ -11,7 +11,7 @@ Orden: la más reciente arriba.
 
 ---
 
-## 2026-08-31 — El SDK de Android vive fuera de la ruta estándar
+## 2026-09-01 — El SDK de Android vive fuera de la ruta estándar
 
 ### Qué se decidió
 

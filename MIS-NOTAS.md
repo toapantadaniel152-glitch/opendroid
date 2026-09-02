@@ -11,7 +11,7 @@ Notas personales sobre este fork. **Archivo nuevo, no upstream.**
 > nunca desde Claude Code. Motivo y detalle en
 > [Reglas de trabajo en este equipo](#reglas-de-trabajo-en-este-equipo).
 
-Última actualización: 2026-09-01
+Última actualización: 2026-09-02
 
 ---
 
@@ -334,7 +334,92 @@ git rev-list --left-right --count main...jman/main
 
 ### Compilar e instalar
 
+**La compilación la lanzo YO desde mi terminal** (Regla 2). Nunca Claude Code.
+
 ```bash
-./gradlew assembleDebug
-# El APK sale en: app/build/outputs/apk/debug/app-debug.apk
+cd C:\Users\Usuario\Desktop\opendroid
 ```
+```bash
+.\gradlew assembleDebug
+```
+
+El APK sale en `app\build\outputs\apk\debug\app-debug.apk`.
+
+Instalar en el S21+ (con el teléfono conectado y autorizado):
+
+```bash
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+`-r` reinstala conservando los datos si ya hubiera una versión.
+
+Ver los logs de la app en vivo (el equivalente a las DevTools):
+
+```bash
+adb logcat -s OpenDroid:V AndroidRuntime:E
+```
+
+`Ctrl+C` para salir. Aquí es donde aparecerá el bucle de crasheo del servicio en
+primer plano si se manifiesta tras un reinicio del teléfono — ver `faa87a2` en
+`PARCHES-PENDIENTES.md`.
+
+Si `adb` se comporta de forma extraña (dispositivo que no aparece, estados
+incoherentes), puede haber un servidor viejo colgado:
+
+```bash
+adb kill-server
+```
+
+Arranca uno nuevo solo con volver a ejecutar `adb devices`.
+
+---
+
+## Registro: primera compilación e instalación
+
+**2026-09-02 — funcionó a la primera.**
+
+| | |
+|---|---|
+| Resultado | `BUILD SUCCESSFUL` |
+| Duración | **7 min 36 s** (42 tareas, 42 ejecutadas) |
+| APK | `app\build\outputs\apk\debug\app-debug.apk`, **69,7 MB** |
+| Paquete | `com.opendroid.aiagent` v1.0.6 (`versionCode` 7) |
+| Compilado contra | `compileSdk` 36 / `targetSdk` 36 |
+| Firma | Clave de depuración (`apkSigningVersion=2`) — no sirve para publicar |
+| Instalación | `Success`, `firstInstallTime=2026-09-02 13:10:10` |
+
+**Las siguientes compilaciones son mucho más rápidas.** Gradle guardó la caché de
+configuración (`Configuration cache entry stored`) y las dependencias quedaron en
+`C:\Users\Usuario\.gradle`. Espero **1-2 minutos**, no 7 y medio.
+
+### Avisos normales que NO son errores
+
+La compilación imprime muchas advertencias de deprecación de Compose, del tipo:
+
+```
+w: Icons.Filled.KeyboardArrowRight is deprecated.
+   Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight
+```
+
+Son recomendaciones de accesibilidad (iconos que se voltean en idiomas de derecha a
+izquierda). **No las arreglo**: están en archivos upstream. El refactor `5901760` de
+jman incluye esa migración, con prioridad baja en `PARCHES-PENDIENTES.md`.
+
+Lo único que importa es la última línea: `BUILD SUCCESSFUL` o `BUILD FAILED`.
+
+### Mi teléfono, datos verificados con adb
+
+| Dato | Valor |
+|---|---|
+| Modelo | `SM-G996U1` — Galaxy S21+ 5G (nombre interno `t2q`) |
+| Serie (`adb devices`) | `RFCR91PWY7A` |
+| Android | 15 — **API 35** |
+| Parche de seguridad | 2026-01-01 |
+| Arquitectura | `arm64-v8a` |
+
+API 35 contra `minSdk 26`: compatible de sobra. Y **API 35 es Android 14+**, así que
+las restricciones de servicios en primer plano que arregla `faa87a2` me afectan de
+lleno — ya no es una suposición, está medido.
+
+Como el proyecto no usa código nativo ni filtros de ABI, el APK es universal y no hay
+nada que configurar por arquitectura.
